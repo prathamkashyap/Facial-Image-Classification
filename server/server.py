@@ -3,7 +3,7 @@
 import os
 from pathlib import Path
 
-from flask import Flask, jsonify, redirect, request, url_for
+from flask import Flask, jsonify, request, send_file
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from server import util
@@ -20,7 +20,13 @@ def create_app():
 
     @app.get("/")
     def index():
-        return redirect(url_for("static", filename="app.html"))
+        return app.send_static_file("app.html")
+
+    @app.get("/samples/serena.jpg")
+    def serena_sample():
+        return send_file(
+            Path(__file__).resolve().parent / "test_images" / "serena1.jpg"
+        )
 
     @app.get("/healthz")
     def health():

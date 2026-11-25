@@ -1,144 +1,124 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101512">
+    <meta name="description" content="Explore the predictions of a five-athlete photo classifier.">
     <title>Sports Person Classifier</title>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css">
-    <link rel="stylesheet" href="./dropzone.min.css">
-    <link rel="stylesheet" href="./app.css">
+    <link rel="stylesheet" href="/assets/app.css">
+    <script src="/assets/app.js" defer></script>
 </head>
-
 <body>
-    <nav class="navbar navbar-light bg-light justify-content-center">
-        <a class="navbar-brand" href="#">Sports Person Classifier</a>
-    </nav>
-
-    <div class="container">
-        <div class="row">
-        <div class="col card-wrapper" data-player="lionel_messi">
-                <div class="card border-0">
-                    <div class="position-relative rounded-circle overflow-hidden mx-auto custom-circle-image">
-                        <img class="w-100 h-100" src="./images/messi.jpeg" alt="Card image cap">
-                    </div>
-                    <div class="card-body text-center mt-4">
-                        <h4 class="text-uppercase card-title">Lionel Messi</h4>
-                        </p>
-                    </div>
-                </div>
-            </div>            
-            <div class="col card-wrapper" data-player="maria_sharapova">
-                    <div class="card border-0">
-                        <div class="position-relative rounded-circle overflow-hidden mx-auto custom-circle-image">
-                            <img class="w-100 h-100" src="./images/sharapova.jpeg" alt="Card image cap">
-                        </div>
-                        <div class="card-body text-center mt-4">
-                            <h4 class="text-uppercase card-title">Maria Sharapova</h4>
-                            </p>
-                        </div>
-                    </div>
-            </div>            
-            <div class="col card-wrapper" data-player="roger_federer">
-                    <div class="card border-0">
-                        <div class="position-relative rounded-circle overflow-hidden mx-auto custom-circle-image">
-                            <img class="w-100 h-100" src="./images/federer.jpeg" alt="Card image cap">
-                        </div>
-                        <div class="card-body text-center mt-4">
-                            <h4 class="text-uppercase card-title">Roger Federer</h4>
-                            </p>
-                        </div>
-                    </div>
-            </div>          
-
-            <div class="col card-wrapper" data-player="serena_williams">
-                <div class="card border-0">
-                    <div class="position-relative rounded-circle overflow-hidden mx-auto custom-circle-image">
-                        <img class="w-100 h-100" src="./images/serena.jpeg" alt="Card image cap">
-                    </div>
-                    <div class="card-body text-center mt-4">
-                        <h4 class="text-uppercase card-title">Serena Williams</h4>
-                        </p>
-                    </div>
-                </div>
-            </div>      
-
-            <div class="col card-wrapper" data-player="virat_kohli">
-                <div class="card border-0">
-                    <div class="position-relative rounded-circle overflow-hidden mx-auto custom-circle-image">
-                        <img class="w-100 h-100" src="./images/virat.jpeg" alt="Card image cap">
-                    </div>
-                    <div class="card-body text-center mt-4">
-                        <h4 class="text-uppercase card-title">Virat Kohli</h4>
-                        </p>
-                    </div>
-                </div>
-            </div>
-
+    <header class="site-header">
+        <div class="shell header-inner">
+            <a class="wordmark" href="/"><span class="focus-mark" aria-hidden="true"></span> Face Classifier</a>
+            <a class="source-link" href="https://github.com/prathamkashyap/Facial-Image-Classification">GitHub <span aria-hidden="true">↗</span></a>
         </div>
+    </header>
+    <main class="shell">
+        <section class="intro" aria-labelledby="title">
+            <h1 id="title">Sports Person<br class="title-break"> <span>Classifier</span></h1>
+            <p>Upload a photo or try a sample. See which of the five athletes the model predicts for each detected face.</p>
+        </section>
 
-        <div class="row">
-            <div class="col-sm-4">
-                <div class="row">
-                    <div class="col-12 mx-auto">
-                        <form action="/file-upload" class="dropzone" id="dropzone">
-                            <div class="dz-message needsclick">
-                                <img src="./images/upload.png" width="50vw" height="50vw"><br>
-                                <span class="note needsclick">Drop files here or click to upload</span>
-                            </div>
-                        </form>
+        <section class="workspace" aria-label="Image classification">
+            <article class="panel input-panel">
+                <h2>Photo</h2>
+                <form id="upload-form">
+                    <div id="drop-area" class="drop-area">
+                        <div id="upload-prompt" class="upload-prompt">
+                            <span class="upload-mark" aria-hidden="true">↑</span>
+                            <strong>Drop a photo here</strong>
+                            <span class="muted">JPEG, PNG or WebP · Up to 8 MiB</span>
+                        </div>
+                        <div id="preview-frame" class="preview-frame" hidden>
+                            <img id="photo-preview" alt="Selected photo">
+                            <div id="face-boxes" class="face-boxes" aria-hidden="true"></div>
+                        </div>
+                        <label class="file-control">
+                            <span id="file-label">Choose photo</span>
+                            <input id="photo-input" type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp">
+                        </label>
+                    </div>
+                    <div id="photo-actions" class="photo-actions" hidden>
+                        <p id="photo-name" class="photo-name"></p>
+                        <button id="reset-photo" type="button" class="quiet-button">Clear</button>
+                        <button id="classify" type="submit" class="primary-button" disabled>Classify photo</button>
+                    </div>
+                    <p id="upload-status" class="feedback" role="status"></p>
+                    <p id="upload-error" class="feedback error" role="alert"></p>
+                </form>
+
+                <div class="examples">
+                    <h3>Try a sample</h3>
+                    <div class="example-list">
+                        <button type="button" class="sample" data-sample="kohli">
+                            <img src="/assets/images/virat.jpeg" alt="" width="32" height="32">
+                            Kohli
+                        </button>
+                        <button type="button" class="sample" data-sample="serena">
+                            <img src="/assets/images/serena.jpeg" alt="" width="32" height="32">
+                            Serena
+                        </button>
+                        <button type="button" class="sample" data-sample="pair">
+                            <img src="/assets/test_images/sharapova_3.jpg" alt="" width="32" height="32">
+                            Two faces
+                        </button>
                     </div>
                 </div>
-                <div class="row mt-3">
-                    <div class="col-3 mx-auto">
-                        <button id="submitBtn" type="button" class="btn btn-success">Classify</button>
-                    </div>
+            </article>
+
+            <article class="panel results-panel" aria-labelledby="results-title">
+                <h2 id="results-title">Predictions</h2>
+                <div id="empty-results" class="empty-results">
+                    <span class="focus-mark" aria-hidden="true"></span>
+                    <p id="empty-message">Choose a photo to see predictions.</p>
                 </div>
-            </div>
-            
-            <div class="col-sm-8 error" id="error" >
-                <p>Can't classify image. Classifier was not able to detect face and two eyes properly</p>    
-            </div>
+                <div id="results" hidden>
+                    <div id="face-picker" class="face-picker" role="group" aria-label="Detected faces" hidden></div>
+                    <div class="prediction">
+                        <div>
+                            <p class="prediction-label">Top prediction</p>
+                            <h3 id="prediction-name"></h3>
+                        </div>
+                        <span id="prediction-score"></span>
+                    </div>
+                    <ul id="score-list" class="score-list" aria-label="Model scores"></ul>
+                    <p class="model-note">The classifier always ranks the same five athletes. Scores cannot verify someone’s identity.</p>
+                </div>
+            </article>
+        </section>
 
-            <div class="col-sm-4" id="resultHolder">
-            </div>
-            <div class="col-sm-4" id="divClassTable">
-                <table id="classTable">
-                        <tr>
-                            <th>Player</th>
-                            <th>Probability Score</th>
-                        </tr>
-                        <tr>
-                            <td>Lionel Messi</td>
-                            <td id="score_lionel_messi"></td>
-                        </tr>
-                        <tr>
-                            <td>Maria Sharapova</td>
-                            <td id="score_maria_sharapova"></td>
-                        </tr>
-                        <tr>
-                            <td>Rodger Federer</td>
-                            <td id="score_roger_federer"></td>
-                        </tr>
-                        <tr>
-                            <td>Serena Williams</td>
-                            <td id="score_serena_williams"></td>
-                        </tr>
-                        <tr>
-                            <td>Virat Kohli</td>
-                            <td id="score_virat_kohli"></td>
-                        </tr>
-                </table>
-            </div>
-            
-        </div>
-
-    </div>
-
+        <section class="roster" aria-labelledby="roster-title">
+            <h2 id="roster-title">Athletes in the model</h2>
+            <ul>
+                <li>
+                    <img src="/assets/images/messi.jpeg" alt="" width="72" height="72">
+                    <div><strong>Lionel Messi</strong><span>Football</span></div>
+                </li>
+                <li>
+                    <img src="/assets/images/sharapova.jpeg" alt="" width="72" height="72">
+                    <div><strong>Maria Sharapova</strong><span>Tennis</span></div>
+                </li>
+                <li>
+                    <img src="/assets/images/federer.jpeg" alt="" width="72" height="72">
+                    <div><strong>Roger Federer</strong><span>Tennis</span></div>
+                </li>
+                <li>
+                    <img src="/assets/images/serena.jpeg" alt="" width="72" height="72">
+                    <div><strong>Serena Williams</strong><span>Tennis</span></div>
+                </li>
+                <li>
+                    <img src="/assets/images/virat.jpeg" alt="" width="72" height="72">
+                    <div><strong>Virat Kohli</strong><span>Cricket</span></div>
+                </li>
+            </ul>
+        </section>
+    </main>
+    <footer class="shell site-footer">
+        <p>Educational demo. Uploads are processed for the current request.</p>
+        <a class="source-link" href="https://github.com/prathamkashyap/Facial-Image-Classification#model-and-data">Model and data <span aria-hidden="true">↗</span></a>
+    </footer>
 </body>
-<!-- <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script> -->
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
-<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"></script>
-<script src="./dropzone.min.js"></script>
-<script src="./app.js"></script>
 </html>
