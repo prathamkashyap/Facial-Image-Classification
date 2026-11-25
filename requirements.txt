@@ -6,3 +6,4 @@ opencv-python-headless==4.13.0.92
 Pillow==12.3.0
 PyWavelets==1.8.0
 scikit-learn==1.6.1
+scipy==1.17.1

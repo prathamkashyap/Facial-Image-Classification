@@ -127,3 +127,21 @@ def test_unavailable_model_is_reported_without_exposing_local_paths(
         "classifier_unavailable",
     )
     assert str(tmp_path) not in failed.get_data(as_text=True)
+
+
+@pytest.mark.parametrize("image_format", ["PNG", "WEBP"])
+def test_other_supported_formats(client, image_format):
+    stream = BytesIO()
+    Image.new("RGB", (63, 50)).save(stream, format=image_format)
+    result = post_image(client, stream.getvalue())
+    assert result.status_code == 200
+    assert result.json["image"] == {"width": 63, "height": 50}
+    assert result.json["faces"] == []
+
+
+def test_face_count_reports_results_beyond_the_scoring_limit(client, monkeypatch):
+    boxes = [(i * 40, 0, 40, 40) for i in range(util.MAX_FACES + 1)]
+    monkeypatch.setattr(util, "detect_faces", lambda _image: boxes)
+    response = post_image(client, image_bytes(width=len(boxes) * 40, height=40)).json
+    assert response["detected_faces"] == util.MAX_FACES + 1
+    assert len(response["faces"]) == util.MAX_FACES
