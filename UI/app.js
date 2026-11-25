@@ -1,22 +1,23 @@
 "use strict";
 
-const samples = {
-    kohli: { name: "Virat Kohli", url: "/assets/test_images/kohli_1.jpg" },
-    serena: { name: "Serena Williams", url: "/samples/serena.jpg" },
-    pair: { name: "Two faces", url: "/assets/test_images/sharapova_3.jpg" },
-};
-
 const byId = (id) => document.getElementById(id);
 const form = byId("upload-form");
 const input = byId("photo-input");
 const dropArea = byId("drop-area");
 const preview = byId("photo-preview");
+const boxesLayer = byId("face-boxes");
+const toggleBoxes = byId("toggle-boxes");
+const download = byId("download-results");
 const submit = byId("classify");
 const status = byId("upload-status");
 const error = byId("upload-error");
+const sampleButtons = document.querySelectorAll(".sample-card[data-sample]");
+const filters = document.querySelectorAll(".sample-filters [data-filter]");
+const sampleItems = document.querySelectorAll(".sample-grid [data-sport]");
 
 let image = null;
 let previewUrl = null;
+let resultUrl = null;
 let operation = null;
 
 function showMessage(element, message) {
@@ -27,7 +28,16 @@ function resetResults(message = "Choose a photo to see predictions.") {
     byId("results").hidden = true;
     byId("empty-results").hidden = false;
     byId("empty-message").textContent = message;
-    byId("face-boxes").replaceChildren();
+    boxesLayer.replaceChildren();
+    boxesLayer.hidden = false;
+    toggleBoxes.setAttribute("aria-pressed", "true");
+    if (resultUrl) URL.revokeObjectURL(resultUrl);
+    resultUrl = null;
+    download.removeAttribute("href");
+}
+
+function selectSample(selected) {
+    sampleButtons.forEach((button) => button.setAttribute("aria-pressed", button === selected));
 }
 
 function clearPhoto() {
@@ -35,6 +45,7 @@ function clearPhoto() {
     operation = null;
     image = null;
     input.value = "";
+    selectSample(null);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     previewUrl = null;
     preview.removeAttribute("src");
@@ -48,10 +59,11 @@ function clearPhoto() {
     resetResults();
 }
 
-function showPhoto(file, name) {
+function showPhoto(file, name, description = "Selected photo") {
     image = file;
     previewUrl = URL.createObjectURL(file);
     preview.src = previewUrl;
+    preview.alt = description;
     byId("preview-frame").hidden = false;
     byId("photo-actions").hidden = false;
     byId("upload-prompt").hidden = true;
@@ -148,11 +160,15 @@ function renderResults(result) {
         byId("score-list").replaceChildren(...scores.map(scoreRow));
     }
 
-    byId("face-boxes").replaceChildren(...boxes);
+    boxesLayer.replaceChildren(...boxes);
     picker.replaceChildren(...buttons);
     picker.hidden = faces.length < 2;
     byId("empty-results").hidden = true;
     byId("results").hidden = false;
+    resultUrl = URL.createObjectURL(new Blob([`${JSON.stringify(result, null, 2)}\n`], {
+        type: "application/json",
+    }));
+    download.href = resultUrl;
     selectFace(0);
     const message = detected > faces.length
         ? `Showing ${faces.length} of ${detected} detected faces.`
@@ -201,6 +217,11 @@ byId("reset-photo").addEventListener("click", () => {
     input.focus();
 });
 
+toggleBoxes.addEventListener("click", () => {
+    boxesLayer.hidden = !boxesLayer.hidden;
+    toggleBoxes.setAttribute("aria-pressed", !boxesLayer.hidden);
+});
+
 dropArea.addEventListener("dragover", (event) => {
     event.preventDefault();
     dropArea.classList.add("is-dragging");
@@ -214,22 +235,40 @@ dropArea.addEventListener("drop", (event) => {
     choosePhoto(Array.from(event.dataTransfer.files));
 });
 
-document.querySelectorAll("[data-sample]").forEach((button) => {
+filters.forEach((filter) => {
+    filter.addEventListener("click", () => {
+        const sport = filter.dataset.filter;
+        filters.forEach((button) => button.setAttribute("aria-pressed", button === filter));
+        let count = 0;
+        sampleItems.forEach((item) => {
+            item.hidden = sport !== "all" && item.dataset.sport !== sport;
+            if (!item.hidden) count += 1;
+        });
+        showMessage(byId("sample-status"), `Showing ${count} sample ${count === 1 ? "photo" : "photos"}.`);
+    });
+});
+
+sampleButtons.forEach((button) => {
     button.addEventListener("click", async () => {
         clearPhoto();
+        selectSample(button);
+        byId("workspace").scrollIntoView({ block: "start" });
+        byId("photo-heading").focus({ preventScroll: true });
         operation = new AbortController();
         const { signal } = operation;
-        const { name, url } = samples[button.dataset.sample];
+        const url = button.dataset.sample;
+        const name = button.querySelector(".sample-card-title").textContent;
         showMessage(status, "Loading sample…");
         try {
             const response = await fetch(url, { signal });
             if (!response.ok) throw new Error("Sample unavailable.");
             const blob = await response.blob();
             if (signal.aborted) return;
-            showPhoto(new File([blob], url.split("/").at(-1), { type: blob.type }), name);
+            showPhoto(new File([blob], url.split("/").at(-1), { type: blob.type }), name, name);
             await classify(image, signal);
         } catch {
             if (!signal.aborted) {
+                selectSample(null);
                 showMessage(status, "");
                 showMessage(error, "Could not load the sample. Try again.");
             }

@@ -3,28 +3,39 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#101512">
+    <meta name="theme-color" content="#211330">
     <meta name="description" content="Explore the predictions of a five-athlete photo classifier.">
     <title>Sports Person Classifier</title>
     <link rel="stylesheet" href="/assets/app.css">
+    <link rel="icon" href="/assets/images/favicon.png" type="image/png">
     <script src="/assets/app.js" defer></script>
 </head>
 <body>
     <header class="site-header">
         <div class="shell header-inner">
             <a class="wordmark" href="/"><span class="focus-mark" aria-hidden="true"></span> Face Classifier</a>
-            <a class="source-link" href="https://github.com/prathamkashyap/Facial-Image-Classification">GitHub <span aria-hidden="true">↗</span></a>
+            <nav class="header-links" aria-label="Main">
+                <a class="source-link" href="#samples">Sample gallery</a>
+                <a class="source-link" href="https://github.com/prathamkashyap/Facial-Image-Classification">GitHub <span aria-hidden="true">↗</span></a>
+            </nav>
         </div>
     </header>
     <main class="shell">
         <section class="intro" aria-labelledby="title">
-            <h1 id="title">Sports Person<br class="title-break"> <span>Classifier</span></h1>
-            <p>Upload a photo or try a sample. See which of the five athletes the model predicts for each detected face.</p>
+            <div class="intro-content">
+                <h1 id="title">Sports Person<br class="hero-title-break"> <span>Classifier</span></h1>
+                <p>Upload a photo or try a sample to see how the model scores five athletes for each detected face.</p>
+                <div class="intro-actions">
+                    <a class="primary-button" href="#workspace">Open classifier</a>
+                    <a class="quiet-button" href="#samples">Explore sample photos</a>
+                </div>
+            </div>
+            <div class="intro-art" aria-hidden="true"></div>
         </section>
 
-        <section class="workspace" aria-label="Image classification">
+        <section class="workspace" id="workspace" aria-label="Image classification">
             <article class="panel input-panel">
-                <h2>Photo</h2>
+                <h2 id="photo-heading" tabindex="-1">Photo</h2>
                 <form id="upload-form">
                     <div id="drop-area" class="drop-area">
                         <div id="upload-prompt" class="upload-prompt">
@@ -49,24 +60,6 @@
                     <p id="upload-status" class="feedback" role="status"></p>
                     <p id="upload-error" class="feedback error" role="alert"></p>
                 </form>
-
-                <div class="examples">
-                    <h3>Try a sample</h3>
-                    <div class="example-list">
-                        <button type="button" class="sample" data-sample="kohli">
-                            <img src="/assets/images/virat.jpeg" alt="" width="32" height="32">
-                            Kohli
-                        </button>
-                        <button type="button" class="sample" data-sample="serena">
-                            <img src="/assets/images/serena.jpeg" alt="" width="32" height="32">
-                            Serena
-                        </button>
-                        <button type="button" class="sample" data-sample="pair">
-                            <img src="/assets/test_images/sharapova_3.jpg" alt="" width="32" height="32">
-                            Two faces
-                        </button>
-                    </div>
-                </div>
             </article>
 
             <article class="panel results-panel" aria-labelledby="results-title">
@@ -85,33 +78,131 @@
                         <span id="prediction-score"></span>
                     </div>
                     <ul id="score-list" class="score-list" aria-label="Model scores"></ul>
-                    <p class="model-note">The classifier always ranks the same five athletes. Scores cannot verify someone’s identity.</p>
+                    <div class="result-actions">
+                        <button class="quiet-button" id="toggle-boxes" type="button" aria-controls="face-boxes" aria-pressed="true">Face boxes</button>
+                        <a class="quiet-button" id="download-results" download="classifier-results.json">Download JSON</a>
+                    </div>
+                    <p class="model-note">The model compares every face against the same five athletes. Its scores cannot verify someone’s identity.</p>
                 </div>
             </article>
         </section>
 
-        <section class="roster" aria-labelledby="roster-title">
-            <h2 id="roster-title">Athletes in the model</h2>
-            <ul>
-                <li>
-                    <img src="/assets/images/messi.jpeg" alt="" width="72" height="72">
-                    <div><strong>Lionel Messi</strong><span>Football</span></div>
+        <section class="sample-gallery" id="samples" aria-labelledby="sample-title">
+            <div class="section-heading">
+                <div>
+                    <h2 id="sample-title">Sample gallery</h2>
+                    <p>Choose a photo to run the classifier on it.</p>
+                </div>
+                <a class="source-link" href="https://github.com/prathamkashyap/Facial-Image-Classification/blob/main/docs/PHOTO_CREDITS.md">Photo credits <span aria-hidden="true">↗</span></a>
+            </div>
+            <div class="sample-filters" role="group" aria-label="Filter sample photos">
+                <button class="quiet-button" type="button" data-filter="all" aria-pressed="true">All photos</button>
+                <button class="quiet-button" type="button" data-filter="football" aria-pressed="false">Football</button>
+                <button class="quiet-button" type="button" data-filter="tennis" aria-pressed="false">Tennis</button>
+                <button class="quiet-button" type="button" data-filter="cricket" aria-pressed="false">Cricket</button>
+                <button class="quiet-button" type="button" data-filter="group" aria-pressed="false">Group</button>
+            </div>
+            <p id="sample-status" class="visually-hidden" role="status"></p>
+            <ul class="sample-grid">
+                <li data-sport="football">
+                    <button type="button" class="sample-card" data-sample="/assets/samples/messi.webp" aria-pressed="false">
+                        <img class="sample-card-photo" src="/assets/samples/messi.webp" alt="" width="360" height="240" decoding="async" style="--photo-position: center 38%">
+                        <span class="sample-card-body">
+                            <span class="sample-card-title">Lionel Messi</span>
+                            <span class="sample-card-detail">Football · World Cup 2022</span>
+                            <span class="sample-card-arrow" aria-hidden="true">↗</span>
+                        </span>
+                    </button>
                 </li>
-                <li>
-                    <img src="/assets/images/sharapova.jpeg" alt="" width="72" height="72">
-                    <div><strong>Maria Sharapova</strong><span>Tennis</span></div>
+                <li data-sport="tennis">
+                    <button type="button" class="sample-card" data-sample="/assets/samples/sharapova.webp" aria-pressed="false">
+                        <img class="sample-card-photo" src="/assets/samples/sharapova.webp" alt="" width="360" height="240" decoding="async" style="--photo-position: center 34%">
+                        <span class="sample-card-body">
+                            <span class="sample-card-title">Maria Sharapova</span>
+                            <span class="sample-card-detail">Tennis · 2016 portrait</span>
+                            <span class="sample-card-arrow" aria-hidden="true">↗</span>
+                        </span>
+                    </button>
                 </li>
-                <li>
-                    <img src="/assets/images/federer.jpeg" alt="" width="72" height="72">
-                    <div><strong>Roger Federer</strong><span>Tennis</span></div>
+                <li data-sport="tennis">
+                    <button type="button" class="sample-card" data-sample="/assets/samples/federer.webp" aria-pressed="false">
+                        <img class="sample-card-photo" src="/assets/samples/federer.webp" alt="" width="360" height="240" decoding="async" style="--photo-position: center 48%">
+                        <span class="sample-card-body">
+                            <span class="sample-card-title">Roger Federer</span>
+                            <span class="sample-card-detail">Tennis · 2015 portrait</span>
+                            <span class="sample-card-arrow" aria-hidden="true">↗</span>
+                        </span>
+                    </button>
                 </li>
-                <li>
-                    <img src="/assets/images/serena.jpeg" alt="" width="72" height="72">
-                    <div><strong>Serena Williams</strong><span>Tennis</span></div>
+                <li data-sport="tennis">
+                    <button type="button" class="sample-card" data-sample="/assets/samples/williams.webp" aria-pressed="false">
+                        <img class="sample-card-photo" src="/assets/samples/williams.webp" alt="" width="360" height="240" decoding="async" style="--photo-position: center 28%">
+                        <span class="sample-card-body">
+                            <span class="sample-card-title">Serena Williams</span>
+                            <span class="sample-card-detail">Tennis · Australian Open 2015</span>
+                            <span class="sample-card-arrow" aria-hidden="true">↗</span>
+                        </span>
+                    </button>
                 </li>
-                <li>
-                    <img src="/assets/images/virat.jpeg" alt="" width="72" height="72">
-                    <div><strong>Virat Kohli</strong><span>Cricket</span></div>
+                <li data-sport="cricket">
+                    <button type="button" class="sample-card" data-sample="/assets/samples/kohli.webp" aria-pressed="false">
+                        <img class="sample-card-photo" src="/assets/samples/kohli.webp" alt="" width="360" height="240" decoding="async" style="--photo-position: center 30%">
+                        <span class="sample-card-body">
+                            <span class="sample-card-title">Virat Kohli</span>
+                            <span class="sample-card-detail">Cricket · India team jersey</span>
+                            <span class="sample-card-arrow" aria-hidden="true">↗</span>
+                        </span>
+                    </button>
+                </li>
+                <li data-sport="group">
+                    <button type="button" class="sample-card" data-sample="/assets/samples/tennis-pair.webp" aria-pressed="false">
+                        <img class="sample-card-photo" src="/assets/samples/tennis-pair.webp" alt="" width="360" height="240" loading="lazy" decoding="async" style="--photo-position: center">
+                        <span class="sample-card-body">
+                            <span class="sample-card-title">Two faces</span>
+                            <span class="sample-card-detail">Tennis photo collage</span>
+                            <span class="sample-card-arrow" aria-hidden="true">↗</span>
+                        </span>
+                    </button>
+                </li>
+                <li data-sport="football">
+                    <button type="button" class="sample-card" data-sample="/assets/samples/messi-2.webp" aria-pressed="false">
+                        <img class="sample-card-photo" src="/assets/samples/messi-2.webp" alt="" width="360" height="240" loading="lazy" decoding="async" style="--photo-position: center 52%">
+                        <span class="sample-card-body">
+                            <span class="sample-card-title">Lionel Messi</span>
+                            <span class="sample-card-detail">Football · Close-up portrait</span>
+                            <span class="sample-card-arrow" aria-hidden="true">↗</span>
+                        </span>
+                    </button>
+                </li>
+                <li data-sport="tennis">
+                    <button type="button" class="sample-card" data-sample="/assets/samples/williams-2.webp" aria-pressed="false">
+                        <img class="sample-card-photo" src="/assets/samples/williams-2.webp" alt="" width="360" height="240" loading="lazy" decoding="async" style="--photo-position: center 49%">
+                        <span class="sample-card-body">
+                            <span class="sample-card-title">Serena Williams</span>
+                            <span class="sample-card-detail">Tennis · US Open 2013</span>
+                            <span class="sample-card-arrow" aria-hidden="true">↗</span>
+                        </span>
+                    </button>
+                </li>
+                <li data-sport="tennis">
+                    <button type="button" class="sample-card" data-sample="/assets/samples/sharapova-2.webp" aria-pressed="false">
+                        <img class="sample-card-photo" src="/assets/samples/sharapova-2.webp" alt="" width="360" height="240" loading="lazy" decoding="async" style="--photo-position: center 35%">
+                        <span class="sample-card-body">
+                            <span class="sample-card-title">Maria Sharapova</span>
+                            <span class="sample-card-detail">Tennis · Australian Open players’ party</span>
+                            <span class="sample-card-arrow" aria-hidden="true">↗</span>
+                        </span>
+                    </button>
+                </li>
+                <li data-sport="cricket">
+                    <button type="button" class="sample-card" data-sample="/assets/samples/kohli-2.webp" aria-pressed="false">
+                        <img class="sample-card-photo" src="/assets/samples/kohli-2.webp" alt="" width="360" height="240" loading="lazy" decoding="async" style="--photo-position: center 36%">
+                        <span class="sample-card-body">
+                            <span class="sample-card-title">Virat Kohli</span>
+                            <span class="sample-card-detail">Cricket · IPL opening ceremony</span>
+                            <span class="sample-card-arrow" aria-hidden="true">↗</span>
+                        </span>
+                    </button>
                 </li>
             </ul>
         </section>
