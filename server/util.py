@@ -1,118 +1,223 @@
-import joblib
-import json
-import numpy as np
+"""Shared image decoding, face detection, and model inference."""
+
 import base64
+import binascii
+import json
+import os
+from functools import lru_cache
+from io import BytesIO
+from pathlib import Path
+from pickle import UnpicklingError
+from threading import local
+
 import cv2
+import joblib
+import numpy as np
+from PIL import Image, ImageOps, UnidentifiedImageError
+
 from server.wavelet import w2d
 
-__class_name_to_number = {}
-__class_number_to_name = {}
+ARTIFACT_DIR = Path(__file__).resolve().parent / "artifacts"
+MAX_IMAGE_BYTES = 8 * 1024 * 1024
+MAX_IMAGE_PIXELS = 12_000_000
+MAX_IMAGE_SIDE = 6_000
+MAX_FACES = 8
+IMAGE_FORMATS = ("JPEG", "PNG", "WEBP")
+FEATURE_COUNT = 32 * 32 * 4
+_thread = local()
 
-__model = None
+
+class ImageInputError(ValueError):
+    def __init__(self, code, message, status):
+        super().__init__(message)
+        self.code = code
+        self.status = status
+
+
+class ClassifierUnavailable(RuntimeError):
+    pass
+
+
+@lru_cache(maxsize=1)
+def load_saved_artifacts():
+    directory = Path(os.environ.get("CLASSIFIER_ARTIFACT_DIR", ARTIFACT_DIR))
+    try:
+        with (directory / "class_dictionary.json").open(encoding="utf-8") as file:
+            labels = json.load(file)
+        # This operator-controlled directory must contain trusted files.
+        model = joblib.load(directory / "saved_model.pkl")
+        indices = list(labels.values())
+        if (
+            not indices
+            or any(type(index) is not int for index in indices)
+            or len(set(indices)) != len(labels)
+            or set(model.classes_) != set(indices)
+            or model.n_features_in_ != FEATURE_COUNT
+        ):
+            raise ValueError("The class dictionary and fitted model are incompatible.")
+    except (
+        OSError,
+        EOFError,
+        UnpicklingError,
+        AttributeError,
+        ImportError,
+        TypeError,
+        ValueError,
+    ) as error:
+        raise ClassifierUnavailable(
+            "Classifier artifacts could not be loaded."
+        ) from error
+    return model, {index: label for label, index in labels.items()}
+
+
+def _cascades():
+    if not hasattr(_thread, "cascades"):
+        folder = Path(cv2.data.haarcascades)
+        face = cv2.CascadeClassifier(
+            str(folder / "haarcascade_frontalface_default.xml")
+        )
+        eyes = cv2.CascadeClassifier(str(folder / "haarcascade_eye.xml"))
+        if face.empty() or eyes.empty():
+            raise ClassifierUnavailable("OpenCV face or eye cascade is unavailable.")
+        # CascadeClassifier uses mutable native state. Each request thread gets its own pair.
+        _thread.cascades = (face, eyes)
+    return _thread.cascades
+
+
+def check_ready():
+    load_saved_artifacts()
+    _cascades()
+
+
+def decode_image(data):
+    if not data:
+        raise ImageInputError("missing_image", "Choose an image to classify.", 400)
+    if len(data) > MAX_IMAGE_BYTES:
+        raise ImageInputError(
+            "image_too_large", "Choose an image that is 8 MiB or smaller.", 413
+        )
+
+    try:
+        with Image.open(BytesIO(data), formats=IMAGE_FORMATS) as source:
+            width, height = source.size
+            if width * height > MAX_IMAGE_PIXELS or max(width, height) > MAX_IMAGE_SIDE:
+                raise Image.DecompressionBombError
+            image = ImageOps.exif_transpose(source).convert("RGB")
+            return cv2.cvtColor(np.asarray(image), cv2.COLOR_RGB2BGR)
+    except Image.DecompressionBombError as error:
+        raise ImageInputError(
+            "image_dimensions",
+            "Choose an image with at most 12 megapixels and 6,000 pixels per side.",
+            413,
+        ) from error
+    except (UnidentifiedImageError, OSError, SyntaxError, ValueError) as error:
+        raise ImageInputError(
+            "invalid_image", "Use a readable JPEG, PNG, or WebP image.", 422
+        ) from error
+
+
+def _decode_base64(value):
+    if not value:
+        raise ImageInputError("missing_image", "Choose an image to classify.", 400)
+    encoded = value.split(",", 1)[-1] if value.startswith("data:") else value
+    if len(encoded) > 4 * ((MAX_IMAGE_BYTES + 2) // 3):
+        raise ImageInputError(
+            "image_too_large", "Choose an image that is 8 MiB or smaller.", 413
+        )
+    try:
+        return base64.b64decode(encoded, validate=True)
+    except (binascii.Error, ValueError) as error:
+        raise ImageInputError(
+            "invalid_base64", "The image data is invalid base64.", 400
+        ) from error
+
+
+def read_image_file(path):
+    with Path(path).open("rb") as file:
+        return decode_image(file.read(MAX_IMAGE_BYTES + 1))
+
+
+def detect_faces(image):
+    """Return qualifying (x, y, width, height) boxes in the decoded image."""
+    face_detector, eye_detector = _cascades()
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    boxes = []
+    detected = face_detector.detectMultiScale(gray, scaleFactor=1.3, minNeighbors=5)
+    for x, y, w, h in detected:
+        if len(eye_detector.detectMultiScale(gray[y : y + h, x : x + w])) >= 2:
+            boxes.append((int(x), int(y), int(w), int(h)))
+    return sorted(boxes, key=lambda box: (-box[2] * box[3], box[1], box[0]))
+
+
+def face_features(crop):
+    raw = cv2.resize(crop, (32, 32))
+    wavelet = cv2.resize(w2d(crop, "db1", 5), (32, 32))
+    return np.concatenate((raw.ravel(), wavelet.ravel())).astype(np.float64)
+
+
+def classify_faces(image):
+    model, names = load_saved_artifacts()
+    height, width = image.shape[:2]
+    boxes = detect_faces(image)
+    faces = []
+    if boxes:
+        features = np.stack(
+            [
+                face_features(image[y : y + h, x : x + w])
+                for x, y, w, h in boxes[:MAX_FACES]
+            ]
+        )
+        for box, label, probabilities in zip(
+            boxes[:MAX_FACES],
+            model.predict(features),
+            model.predict_proba(features),
+            strict=True,
+        ):
+            scores = sorted(
+                zip(probabilities, model.classes_, strict=True), reverse=True
+            )
+            faces.append(
+                {
+                    "box": dict(zip(("x", "y", "width", "height"), box, strict=True)),
+                    "label": names[label],
+                    "scores": [
+                        {
+                            "label": names[index],
+                            "score": round(float(probability) * 100, 2),
+                        }
+                        for probability, index in scores
+                    ],
+                }
+            )
+    return {
+        "image": {"width": width, "height": height},
+        "detected_faces": len(boxes),
+        "faces": faces,
+    }
+
+
+def classify_bytes(data):
+    return classify_faces(decode_image(data))
+
 
 def classify_image(image_base64_data, file_path=None):
-
-    imgs = get_cropped_image_if_2_eyes(file_path, image_base64_data)
-
-    result = []
-    for img in imgs:
-        scalled_raw_img = cv2.resize(img, (32, 32))
-        img_har = w2d(img, 'db1', 5)
-        scalled_img_har = cv2.resize(img_har, (32, 32))
-        combined_img = np.vstack((scalled_raw_img.reshape(32 * 32 * 3, 1), scalled_img_har.reshape(32 * 32, 1)))
-
-        len_image_array = 32*32*3 + 32*32
-
-        final = combined_img.reshape(1,len_image_array).astype(float)
-        result.append({
-            'class': class_number_to_name(__model.predict(final)[0]),
-            'class_probability': np.around(__model.predict_proba(final)*100,2).tolist()[0],
-            'class_dictionary': __class_name_to_number
-        })
-
-    return result
-
-def class_number_to_name(class_num):
-    return __class_number_to_name[class_num]
-
-def load_saved_artifacts():
-    print("loading saved artifacts...start")
-    global __class_name_to_number
-    global __class_number_to_name
-
-    with open("class_dictionary.json", "r") as f:
-        __class_name_to_number = json.load(f)
-        __class_number_to_name = {v:k for k,v in __class_name_to_number.items()}
-
-    global __model
-    if __model is None:
-        with open('server/artifacts/saved_model.pkl', 'rb') as f:
-            __model = joblib.load(f)
-    print("loading saved artifacts...done")
-
-
-# def get_cv2_image_from_base64_string(b64str):
-#     '''
-#     credit: https://stackoverflow.com/questions/33754935/read-a-base-64-encoded-image-from-memory-using-opencv-python-library
-#     :param uri:
-#     :return:
-#     '''
-#     encoded_data = b64str.split(',')[1]
-#     nparr = np.frombuffer(base64.b64decode(encoded_data), np.uint8)
-#     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-#     return img
-
-def get_cv2_image_from_base64_string(b64str):
-    '''
-    credit: https://stackoverflow.com/questions/33754935/read-a-base-64-encoded-image-from-memory-using-opencv-python-library
-    :param uri:
-    :return:
-    '''
-    if ',' in b64str:
-        encoded_data = b64str.split(',')[1]  # Get base64 part
-    else:
-        raise ValueError("Invalid base64 string format.")
-    
-    nparr = np.frombuffer(base64.b64decode(encoded_data), np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    return img
-
-
-def get_cropped_image_if_2_eyes(image_path, image_base64_data):
-    face_cascade = cv2.CascadeClassifier('model/opencv:haarcascades/haarcascade_frontalface_default.xml')
-    eye_cascade = cv2.CascadeClassifier('model/opencv:haarcascades/haarcascade_eye.xml')
-
-    if image_path:
-        img = cv2.imread(image_path)
-    else:
-        img = get_cv2_image_from_base64_string(image_base64_data)
-
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    faces = face_cascade.detectMultiScale(gray, 1.3, 5)
-
-    cropped_faces = []
-    for (x,y,w,h) in faces:
-            roi_gray = gray[y:y+h, x:x+w]
-            roi_color = img[y:y+h, x:x+w]
-            eyes = eye_cascade.detectMultiScale(roi_gray)
-            if len(eyes) >= 2:
-                cropped_faces.append(roi_color)
-    return cropped_faces
-
-def get_b64_test_image_for_virat():
-    with open("server/b64.txt") as f:
-        return f.read()
-
-if __name__ == '__main__':
-    load_saved_artifacts()
-
-    # print(classify_image(get_b64_test_image_for_virat(), None))
-
-    # print(classify_image(None, "server/test_images/federer1.jpg"))
-    # print(classify_image(None, "server/test_images/federer2.jpg"))
-    # print(classify_image(None, "server/test_images/virat1.jpg"))
-    # print(classify_image(None, "server/test_images/virat2.jpg"))
-    print(classify_image(None, "server/test_images/virat3.jpg")) # Inconsistent result could be due to https://github.com/scikit-learn/scikit-learn/issues/13211
-    # print(classify_image(None, "server/test_images/serena1.jpg"))
-    # print(classify_image(None, "server/test_images/serena2.jpg"))
-    # print(classify_image(None, "server/test_images/sharapova1.jpg"))
+    """Return the legacy result format for a base64 string or a local image path."""
+    image = (
+        read_image_file(file_path)
+        if file_path
+        else decode_image(_decode_base64(image_base64_data))
+    )
+    _, names = load_saved_artifacts()
+    labels = [names[index] for index in sorted(names)]
+    dictionary = {label: index for index, label in enumerate(labels)}
+    results = []
+    for face in classify_faces(image)["faces"]:
+        scores = {score["label"]: score["score"] for score in face["scores"]}
+        results.append(
+            {
+                "class": face["label"],
+                "class_probability": [scores[label] for label in labels],
+                "class_dictionary": dictionary,
+            }
+        )
+    return results
