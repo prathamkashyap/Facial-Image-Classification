@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/prathamkashyap/Facial-Image-Classification/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/prathamkashyap/Facial-Image-Classification/actions/workflows/ci.yml)
 
-An interactive image classification demo for Lionel Messi, Maria Sharapova, Roger Federer, Serena Williams, and Virat Kohli. Upload a photo or open a built-in sample to inspect each qualifying face and compare the model’s five class scores.
+An interactive image classification demo for Lionel Messi, Maria Sharapova, Roger Federer, Serena Williams, and Virat Kohli. Upload a photo or pick from ten gallery examples to inspect each qualifying face and compare the model’s five class scores.
 
-![Browser demo showing two boxed faces and ranked model scores](docs/classifier-preview.webp)
+![Jelly-wave classifier demo with a two-face sample and ranked model scores](docs/classifier-preview.webp)
 
 ## Run locally
 
@@ -21,12 +21,12 @@ python -m server.server
 
 On Windows, create the environment with `py -3.11 -m venv .venv` and activate it from PowerShell with `.venv\Scripts\Activate.ps1`.
 
-Open [the local app](http://127.0.0.1:8000), then select **Two faces** to try the result picker. The app accepts JPEG, PNG, and WebP up to 8 MiB, 12 megapixels, and 6,000 pixels per side. Uploads are processed for the current request.
+Open [the local app](http://127.0.0.1:8000), then select **Two faces** in the **Sample gallery** to try the result picker. Filter the gallery by sport, toggle the face boxes, or download all predictions as JSON. The app accepts JPEG, PNG, and WebP up to 8 MiB, 12 megapixels, and 6,000 pixels per side. Uploads are processed for the current request.
 
 ### CLI and Streamlit
 
 ```bash
-python -m server.predict UI/test_images/sharapova_3.jpg
+python -m server.predict UI/samples/tennis-pair.webp
 ```
 
 The CLI prints the same JSON result as the HTTP endpoint. The optional Streamlit interface uses the same image decoder and classifier.
@@ -40,7 +40,7 @@ python -m streamlit run app.py
 
 ```bash
 curl -fsS http://127.0.0.1:8000/healthz
-curl -fsS -F "image=@UI/test_images/sharapova_3.jpg" \
+curl -fsS -F "image=@UI/samples/tennis-pair.webp" \
   http://127.0.0.1:8000/api/v1/classify
 ```
 
@@ -58,9 +58,9 @@ The API reports missing input as `400`, request or image size limits as `413`, u
 
 OpenCV detects faces and checks for two visible eyes. Each qualifying crop becomes a 4,096-value vector that combines resized color pixels and Haar-wavelet detail. The bundled scikit-learn pipeline standardizes those features and ranks the five fixed classes.
 
-The model gives a score for each class even for a person outside the roster. Treat the scores as relative model output for this educational demo and avoid using them to verify identity. Cropping, lighting, and pose can change the results. The bundled photos demonstrate the interface. They are unsuitable for an independent accuracy estimate because their relationship to the original training set is undocumented.
+The model gives a score for each class even for a person outside the roster. Treat the scores as relative model output for this educational demo and avoid using them to verify identity. Cropping, lighting, and pose can change the results. The gallery photos were selected to demonstrate the interface, so their results are unsuitable for estimating accuracy. [Sample photo credits](docs/PHOTO_CREDITS.md)
 
-The original training dataset lives outside this repository. The bundled training artifact was serialized with scikit-learn 1.6.1, which is pinned for compatibility. Load joblib artifacts only from sources you trust. The repository’s sample photos retain their original rights and have incomplete provenance records. [scikit-learn model persistence](https://scikit-learn.org/stable/model_persistence.html)
+The original training dataset lives outside this repository. The bundled training artifact was serialized with scikit-learn 1.6.1, which is pinned for compatibility. Load joblib artifacts only from sources you trust. The current gallery uses credited Wikimedia Commons photos. Older test fixtures have incomplete provenance records. [scikit-learn model persistence](https://scikit-learn.org/stable/model_persistence.html)
 
 ### Retrain with your own labeled photos
 
@@ -77,7 +77,7 @@ dataset/
 
 ```bash
 python -m server.train --dataset /path/to/dataset --output outputs/run-01
-CLASSIFIER_ARTIFACT_DIR=outputs/run-01 python -m server.predict UI/test_images/sharapova_3.jpg
+CLASSIFIER_ARTIFACT_DIR=outputs/run-01 python -m server.predict UI/samples/tennis-pair.webp
 ```
 
 The trainer uses the same feature extraction as inference and keeps images with one qualifying face. It removes identical feature vectors before a seeded, stratified 75/25 split. It writes a fitted model, the class dictionary, and `evaluation.json` into a new directory. The report includes screening counts, per-class precision and recall, F1, and a confusion matrix with actual classes on rows and predictions on columns. Near-duplicate photos can still inflate scores, so use an independently sourced test set to assess generalization.
@@ -94,6 +94,6 @@ node --check UI/app.js
 python -m pytest -q
 ```
 
-GitHub Actions runs these checks on Linux for Python 3.11 and 3.12. The test suite covers valid and invalid uploads, image limits, orientation, multiple faces, legacy response compatibility, and training artifact creation.
+GitHub Actions runs these checks on Linux for Python 3.11 and 3.12. The test suite covers valid and invalid uploads, image limits, orientation, multiple faces, legacy response compatibility, training artifact creation, and all ten gallery examples.
 
 The browser interface lives in [`UI/`](UI/), the Flask API and inference code in [`server/`](server/), and the automated tests in [`tests/`](tests/). The [Procfile](Procfile) starts Gunicorn on the host’s `PORT` on Unix.
